@@ -1,0 +1,176 @@
+#include <DHT.h>
+#include <Adafruit_NeoPixel.h>
+#include<SoftwareSerial.h>
+
+#define DHTPIN 8
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+#define PIN 10
+#define NUMPIXELS 64
+#define BRIGHTNESS data
+
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+SoftwareSerial btSerial(2,3);
+
+const int SignalPin = A0;
+int sensorValue = 0;
+const int TemperaturePin = 8;
+int TemperatureValue = 0;
+
+int pulsePin = 0;                
+int blinkPin = 13;               
+int fadePin = 12;                 
+int fadeRate = 0;             
+
+int data = 10;
+int R = 10;
+int G = 10;
+int B = 10;
+
+volatile int BPM;                 
+volatile int Signal;             
+volatile int IBI = 600;           
+volatile boolean Pulse = false;   
+volatile boolean QS = false;     
+
+static boolean serialVisual = true;  
+
+void setup(){
+  
+  Serial.begin(9600);
+  btSerial.begin(9600);
+  interruptSetup();                 
+  
+  pixels.begin();
+  pixels.show();
+}
+
+
+void loop(){
+
+        pinMode(10, OUTPUT);
+      for(int i=0;i<NUMPIXELS;i=i+2){
+    pixels.setPixelColor(i, pixels.Color(210,210,0)); 
+    pixels.show(); 
+    delay(10);      
+      }
+  
+   int cds = analogRead(A5);      //조도 셋팅
+   int cdsBright = map(cds,0,1023,0,255);
+   
+
+  serialOutput() ;       
+  
+  char c = btSerial.read();  // 어플 조정
+
+  switch(c){
+    case 'a' :        // 네오픽셀 알고리즘 설정 on
+    if (QS == true){
+      
+      if (BPM>65&&BPM<70){
+     
+      pinMode(9, OUTPUT);
+      for(int i=0;i<NUMPIXELS;i=i+2){
+    pixels.setPixelColor(i, pixels.Color(255,125,60)); 
+    pixels.show(); 
+    delay(10);      
+      }
+    }
+      else if (BPM>71&&BPM<80){
+
+      pinMode(9, OUTPUT);
+      for(int i=0;i<NUMPIXELS;i=i+2){
+    pixels.setPixelColor(i, pixels.Color(255,255,0)); 
+    pixels.show(); 
+    delay(10);      
+      }
+    }
+   else if (BPM>80){
+      pinMode(9, OUTPUT);
+      for(int i=0;i<NUMPIXELS;i=i+2){
+    pixels.setPixelColor(i, pixels.Color(128,0,128)); 
+    pixels.show(); 
+    delay(10);
+    }
+    }
+    else
+     pinMode(9, OUTPUT);
+     pixels.show(); 
+     pixels.clear();
+     delay(10);
+     break;
+   } 
+   
+  case 'b' :                // 네오픽셀 전체 off
+  pinMode(9, OUTPUT);
+  pixels.show();
+  pixels.clear();
+  break;
+
+  case 'd' :                   // 네오픽셀  off
+  pinMode(9, OUTPUT);
+    pixels.show(); 
+    pixels.clear();
+    delay(1);
+    break;
+
+      case 'c' :                 // 조도센서
+  analogWrite(9,cdsBright);
+  pixels.show(); 
+  delay(1);
+    break;  
+
+   case 'e' :  
+   if(btSerial.available()>0){     // rgb 디밍 조정
+    data = btSerial.read();
+    btSerial.println(data);
+    pixels.setBrightness(data);
+    
+    for(int i=0; i<NUMPIXELS; i=i+2){
+      pixels.setPixelColor(i,pixels.Color(R,G,B));
+      pixels.show();
+      delay(10);
+    }
+   }
+    
+  
+  }//switch end
+ 
+        fadeRate = 255;         
+        serialOutputWhenBeatHappens();     
+        QS = false;     
+
+   ledFadeToBeat();                      
+   delay(2000); 
+                             
+   sensorValue = analogRead(SignalPin);     // 심박수 정보전달
+
+   Serial.print("BPM: ");
+   Serial.println(BPM);
+   btSerial.print("BPM: ");
+   btSerial.println(BPM);
+
+   int h = dht.readHumidity();    // 온습도 셋팅 및 정보전달
+   int t = dht.readTemperature();
+   TemperatureValue = analogRead(TemperaturePin); 
+   btSerial.print("습도: ");
+   btSerial.print(h);
+   btSerial.print(" %\t");
+   btSerial.print("온도: ");
+   btSerial.print(t);
+   btSerial.println(" C");
+  
+}
+  
+void ledFadeToBeat(){
+    fadeRate -= 15;                         
+    fadeRate = constrain(fadeRate,0,255);   
+    analogWrite(fadePin,fadeRate);         
+  }
+
+void serialEvent() {
+  R = Serial.parseInt();
+  G = Serial.parseInt();
+  B = Serial.parseInt();
+}
